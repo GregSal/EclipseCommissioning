@@ -107,7 +107,7 @@ for i = 1:max(Plot_Groups)
     index = find(Plot_Groups == i);
     FigureTitle = Plot_table{index(1),'key'}{1};
     f = figure('NumberTitle','off','Name',FigureTitle);
-    %% plot the curves from 0-5.5 cm (40%)
+    % plot the full curves 
     subplot(2,1,1);
     for j=1:size(index,1)
         LegendName = Plot_table{index(j),'Curve_label'}{1};
@@ -124,12 +124,13 @@ for i = 1:max(Plot_Groups)
     title(Title,'FontName','Arial','FontSize',20,'fontweight','b')
     legend('show')
     
-    ylim(gca,[40 101]);
-    set (gca,'YTick',40:5:101);
-    xlim(gca,[0 5.5]);
-    set (gca,'XTick',0:1:5.5);
+    ylim(gca,[0 101]);
+    set (gca,'YTick',0:10:101);
+    xlim(gca,[0 7.5]);
+    set (gca,'XTick',0:.5:7.5);
     grid(gca,'minor')
 
+    % plot the curves from 1-4.5 cm (80%)
        subplot(2,1,2);
     for j=1:size(index,1)
         LegendName = Plot_table{index(j),'Curve_label'}{1};

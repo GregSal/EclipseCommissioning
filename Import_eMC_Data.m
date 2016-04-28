@@ -33,6 +33,8 @@ Measured_21D_Data = ImportWelhofferData(data_path, Center, GridSize, Smoothing);
 
 % convert to table variable
 Measured_21D_table = struct2table(Measured_21D_Data);
+
+%%%%%%% Set Parameters
 % Identify Linac
 Parameters = Measured_21D_table.Parameters;
 linac = arrayfun(@(A) sscanf(A.TreatmentUnit,'%s Accelerator'),Parameters,'UniformOutput', false);
@@ -54,6 +56,25 @@ Parameters = Measured_21D_table.Parameters;
 SSD = arrayfun(@(A) num2str(sscanf(A.SSD,'%d mm')/10),Parameters,'UniformOutput', false);
 SSD_string = cellstr(strcat(SSD,' cm'));
 Measured_21D_table.SSD = SSD_string;
+
+%%%%%%% normalize and shift the PDDs
+% set the normalization and shift parameters
+Smoothing = 'linear';
+Shift_location = 'R50';
+%TODO select position by energy
+Position = 5.0;
+disp('21D Measured Data');
+% select the PDDS 
+PDD_Index = find(strcmp(Measured_21D_table.Type,'PDD'));
+for i = 1:length(PDD_Index)
+    Depth = cell2mat(Measured_21D_table{PDD_Index(i),'Depth'});
+    Dose = cell2mat(Measured_21D_table{PDD_Index(i),'Dose'});
+    [ShiftedDepth, NormDose, Shift] = Normalize_PDD(Depth,Dose,GridSize,Smoothing,Shift_location,Position);
+    Measured_21D_table{PDD_Index(i),'Depth'} = {ShiftedDepth};
+    Measured_21D_table{PDD_Index(i),'Dose'} = {NormDose};
+    FieldSizeString = cellstr(Measured_21D_table{PDD_Index(i),'FieldSize'});
+    disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
+end
 
 %% Import 21A Measured data
 data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\21A Measured data\electron profiles and PDDs for isodose lines';
@@ -87,11 +108,38 @@ SSD = arrayfun(@(A) num2str(sscanf(A.SSD,'%d mm')/10),Parameters,'UniformOutput'
 SSD_string = cellstr(strcat(SSD,' cm'));
 Measured_21A_table.SSD = SSD_string;
 
+% Select only 12 MeV  *******************!!!!!!!!!!!!!!!!*************
+EnergyIndex = strcmp(Measured_21A_table.Energy,'12 MeV');
+Measured_21A_table = Measured_21A_table(EnergyIndex,:);
+
+%%%%%%% normalize and shift the PDDs
+% set the normalization and shift parameters
+Smoothing = 'linear';
+Shift_location = 'R50';
+%TODO select position by energy
+Position = 5.0;
+disp('21A Measured Data');
+% select the PDDS 
+PDD_Index = find(strcmp(Measured_21A_table.Type,'PDD'));
+for i = 1:length(PDD_Index)
+    Depth = cell2mat(Measured_21A_table{PDD_Index(i),'Depth'});
+    Dose = cell2mat(Measured_21A_table{PDD_Index(i),'Dose'});
+    [ShiftedDepth, NormDose, Shift] = Normalize_PDD(Depth,Dose,GridSize,Smoothing,Shift_location,Position);
+    Measured_21A_table{PDD_Index(i),'Depth'} = {ShiftedDepth};
+    Measured_21A_table{PDD_Index(i),'Dose'} = {NormDose};
+    FieldSizeString = cellstr(Measured_21A_table{PDD_Index(i),'FieldSize'});
+    disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
+end
+
 %% Import Beam Configuration Data
 Path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\Beam Configuration Data';
 GridSize = 0.1;
 BeamConfigData = ImportBeamConfigData(Path, GridSize);
 BeamConfig_table = struct2table(BeamConfigData);
+
+% Get rid uf underscore in Algorithm
+AlgorithmText = BeamConfig_table.Algorithm;
+BeamConfig_table{:,'Algorithm'} = strrep(AlgorithmText, '_', ' ');
 
 % Convert Applicator to field size
 Algorithms = unique(BeamConfig_table.Algorithm);
@@ -120,20 +168,32 @@ end
 SSD = cellstr(strcat(num2str(ones(size(AlgorithmText))*100),' cm'));
 BeamConfig_table.SSD = SSD;
 
+%%%%%%% normalize and shift the PDDs
+% set the normalization and shift parameters
+Smoothing = 'linear';
+Shift_location = 'R50';
+%TODO select position by energy
+Position = 5.0;
+disp('Beam Config Data');
+% select the PDDS 
+PDD_Index = find(strcmp(BeamConfig_table.Type,'PDD'));
+for i = 1:length(PDD_Index)
+    Depth = cell2mat(BeamConfig_table{PDD_Index(i),'X'});
+    Dose = cell2mat(BeamConfig_table{PDD_Index(i),'Y'});
+    [ShiftedDepth, NormDose, Shift] = Normalize_PDD(Depth,Dose,GridSize,Smoothing,Shift_location,Position);
+    BeamConfig_table{PDD_Index(i),'X'} = {ShiftedDepth};
+    BeamConfig_table{PDD_Index(i),'Y'} = {NormDose};
+    FieldSizeString = cellstr(BeamConfig_table{PDD_Index(i),'FieldSize'});
+    disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
+end
+
 %% Import Eclipse Calculated Plans from the 21A Measured Model 
 DICOM_data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\Eclipse Calculated Data\';
 directory = '21A Measured Model\12MeV';
 data_path = [DICOM_data_path directory];
-GridSize = 0.1;
 
 % Read in Measured PDD Data
-% Dmax = {'3.0 x 3.0'  2.3; '4.0 x 4.0'  2.4; '6.0 x 6.0' 2.4; ...
-%         '8.0 x 8.0'  2.3; '10.0 x 10.0'  2.3; '20.0 x 20.0'  2.0; ...
-%         '30.0 x 30.0'  1.8};
-% Offset = [0 0]; 
-
-Calculated21A_Measured_PDDs = Extract_PDD(data_path,GridSize);
-% CalculatedAAA_PDDs = Extract_PDD(DICOM_data_path,GridSize,Offset,Dmax);
+Calculated21A_Measured_PDDs = Extract_PDD(data_path);
 
 % convert to table variable
 Calculated_21A_table = struct2table(Calculated21A_Measured_PDDs);
@@ -157,20 +217,32 @@ for i = 1:size(Calculated_21A_table,1)
 end
 Calculated_21A_table.Algorithm = Algorithm;
 
+%%%%%%% normalize and shift the PDDs
+% set the normalization and shift parameters
+GridSize = 0.1;
+Smoothing = 'linear';
+Shift_location = 'R50';
+%TODO select position by energy
+Position = 5.0;
+disp('calculated 21A Model Data');
+% select the PDDS 
+PDD_Index = find(strcmp(Calculated_21A_table.Type,'PDD'));
+for i = 1:length(PDD_Index)
+    Depth = cell2mat(Calculated_21A_table{PDD_Index(i),'depth'});
+    Dose = cell2mat(Calculated_21A_table{PDD_Index(i),'dose'});
+    [ShiftedDepth, NormDose, Shift] = Normalize_PDD(Depth,Dose,GridSize,Smoothing,Shift_location,Position);
+    Calculated_21A_table{PDD_Index(i),'depth'} = {ShiftedDepth};
+    Calculated_21A_table{PDD_Index(i),'dose'} = {NormDose};
+    FieldSizeString = cellstr(Calculated_21A_table{PDD_Index(i),'FieldSize'});
+    disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
+end
+
 %% Import Eclipse Calculated Plans from the Golden Beam Model 
 DICOM_data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\Eclipse Calculated Data\';
 directory = 'Golden Beam Model\12MeV';
 data_path = [DICOM_data_path directory];
-GridSize = 0.1;
 
-% Read in Measured PDD Data
-% Dmax = {'3.0 x 3.0'  2.3; '4.0 x 4.0'  2.4; '6.0 x 6.0' 2.4; ...
-%         '8.0 x 8.0'  2.3; '10.0 x 10.0'  2.3; '20.0 x 20.0'  2.0; ...
-%         '30.0 x 30.0'  1.8};
-% Offset = [0 0]; 
-
-GoldenBeam_Measured_PDDs = Extract_PDD(data_path,GridSize);
-% CalculatedAAA_PDDs = Extract_PDD(DICOM_data_path,GridSize,Offset,Dmax);
+GoldenBeam_Measured_PDDs = Extract_PDD(data_path);
 
 % convert to table variable
 GoldenBeam_table = struct2table(GoldenBeam_Measured_PDDs);
@@ -193,8 +265,28 @@ for i = 1:size(GoldenBeam_table,1)
     Algorithm{i} = Algorithm_string;
 end
 GoldenBeam_table.Algorithm = Algorithm;
+%%%%%%% normalize and shift the PDDs
+% set the normalization and shift parameters
+GridSize = 0.1;
+Smoothing = 'linear';
+Shift_location = 'R50';
+%TODO select position by energy
+Position = 5.0;
+disp('calculated Golden Beam Data');
+% select the PDDS 
+PDD_Index = find(strcmp(GoldenBeam_table.Type,'PDD'));
+for i = 1:length(PDD_Index)
+    Depth = cell2mat(GoldenBeam_table{PDD_Index(i),'depth'});
+    Dose = cell2mat(GoldenBeam_table{PDD_Index(i),'dose'});
+    [ShiftedDepth, NormDose, Shift] = Normalize_PDD(Depth,Dose,GridSize,Smoothing,Shift_location,Position);
+    GoldenBeam_table{PDD_Index(i),'depth'} = {ShiftedDepth};
+    GoldenBeam_table{PDD_Index(i),'dose'} = {NormDose};
+    FieldSizeString = cellstr(GoldenBeam_table{PDD_Index(i),'FieldSize'});
+    disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
+end
+
 %%
-save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat','*table')
+save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat','*table');
 tables.BeamConfig_table = BeamConfig_table;
 tables.Measured_21A_table = Measured_21A_table;
 tables.Measured_21D_table = Measured_21D_table;
