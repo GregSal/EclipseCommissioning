@@ -88,15 +88,55 @@ Matchingtables.Calculated_21A_table = Calculated_21A_table;
 %TODO add Sort parameter
 parameters = {'FieldSize','SSD'};
 select{1} = {'Type','PDD'};
-select{2} = {'Energy','12 MeV'};
+% select{2} = {'Energy','12 MeV'};
 MatchParameters = {'FieldSize','Energy'};
-Plot_table = Match_Data(Matchingtables,MatchParameters,select);
+eMC_PDD_Plot_table = Match_Data(Matchingtables,MatchParameters,select);
 %% Save testing data
-% save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\matchtest.mat')
-% TODO save plot data as mat file and as excel file
+save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat','eMC_PDD_Plot_table');
+Excel_filename = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_PDD_data.xls';
+Excel_sheet = '12 MeV PDDs';
+% eMC_PDD_Plot_table.Properties.VariableNames
+% selected = strcmp(eMC_PDD_Plot_table{:,'Energy'},'12 MeV');
+
+% Extract Depth column - all curves will have the same spacing, find the
+% longest one
+Depth_sets = eMC_PDD_Plot_table{:,'X'};
+Depth_length = cellfun(@(x) size(x,1), Depth_sets);
+DepthIndex = find(Depth_length == max(Depth_length));
+Depth = num2cell(cell2mat(eMC_PDD_Plot_table{DepthIndex(1),'X'}));
+xlswrite(Excel_filename,cellstr('Test'),Excel_sheet,'A1')
+xlswrite(Excel_filename,cellstr('Field Size'),Excel_sheet,'A1')
+xlswrite(Excel_filename,cellstr('Depth(cm)'),Excel_sheet,'A2')
+xlswrite(Excel_filename,Depth,Excel_sheet,'A3')
+
+key_list = eMC_PDD_Plot_table{:,'key'};
+unique_keys = sort(unique(key_list));
+Index = 1;
+Dose_cell = cell(1);
+for i = 1:size(unique_keys,1)
+    KeyIndex = find(strcmp(eMC_PDD_Plot_table{:,'key'},unique_keys{i}));
+    for j = 1:size(KeyIndex,1)
+        Header{1,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'FieldSize'});
+        Header{2,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Curve_label'});
+        Dose = num2cell(cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Y'}));
+        %Pad the dose cell array
+        if size(Dose,1) > size(Dose_cell,1)
+            Dose_cell{size(Dose,1),1} = '';
+        elseif size(Dose,1) < size(Dose_cell,1)
+            Dose{size(Dose_cell,1),1} = '';
+        end
+        Dose_cell = [Dose_cell, Dose];
+        Index = Index +1;
+    end
+end
+% remove the extra column from Dose_cell
+ Dose_cell = Dose_cell(:,2:end);
+ Excel_table = [Header; Dose_cell];
+xlswrite(Excel_filename,Excel_table,Excel_sheet,'B1')
+ 
 %% Plot the data
-Plot_table = sortrows(Plot_table,{'key'});
-Plot_Groups = findgroups(Plot_table.key);
+eMC_PDD_Plot_table = sortrows(eMC_PDD_Plot_table,{'key'});
+Plot_Groups = findgroups(eMC_PDD_Plot_table.key);
 maxDepth = 8;
 depthIncrement = 1;
 colors = {'red','green','blue','cyan','magenta','yellow','black','white'};
@@ -105,14 +145,14 @@ linestyles = {'-','--',':','-.'};
 for i = 1:max(Plot_Groups)
     %% Select the data
     index = find(Plot_Groups == i);
-    FigureTitle = Plot_table{index(1),'key'}{1};
+    FigureTitle = eMC_PDD_Plot_table{index(1),'key'}{1};
     f = figure('NumberTitle','off','Name',FigureTitle);
     % plot the full curves 
     subplot(2,1,1);
     for j=1:size(index,1)
-        LegendName = Plot_table{index(j),'Curve_label'}{1};
-        X = cell2mat(Plot_table{index(j),'X'});
-        Y = cell2mat(Plot_table{index(j),'Y'});
+        LegendName = eMC_PDD_Plot_table{index(j),'Curve_label'}{1};
+        X = cell2mat(eMC_PDD_Plot_table{index(j),'X'});
+        Y = cell2mat(eMC_PDD_Plot_table{index(j),'Y'});
         graph = plot(X,Y,'DisplayName',LegendName);
         hold on
         set(graph,'Color',colors{j},'LineWidth',2)
@@ -133,9 +173,9 @@ for i = 1:max(Plot_Groups)
     % plot the curves from 1-4.5 cm (80%)
        subplot(2,1,2);
     for j=1:size(index,1)
-        LegendName = Plot_table{index(j),'Curve_label'}{1};
-        X = cell2mat(Plot_table{index(j),'X'});
-        Y = cell2mat(Plot_table{index(j),'Y'});
+        LegendName = eMC_PDD_Plot_table{index(j),'Curve_label'}{1};
+        X = cell2mat(eMC_PDD_Plot_table{index(j),'X'});
+        Y = cell2mat(eMC_PDD_Plot_table{index(j),'Y'});
         graph = plot(X,Y,'DisplayName',LegendName);
         hold on
         set(graph,'Color',colors{j},'LineWidth',2)
