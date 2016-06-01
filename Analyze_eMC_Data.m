@@ -88,36 +88,45 @@ Matchingtables.Calculated_21A_table = Calculated_21A_table;
 %TODO add Sort parameter
 parameters = {'FieldSize','SSD'};
 select{1} = {'Type','PDD'};
-% select{2} = {'Energy','12 MeV'};
-MatchParameters = {'FieldSize','Energy'};
+select{2} = {'Energy','12 MeV'};
+MatchParameters = {'FieldSize'};
 eMC_PDD_Plot_table = Match_Data(Matchingtables,MatchParameters,select);
-%% Save testing data
+% Save testing data
 save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat','eMC_PDD_Plot_table');
-Excel_filename = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_PDD_data.xls';
-Excel_sheet = '12 MeV PDDs';
 % eMC_PDD_Plot_table.Properties.VariableNames
 % selected = strcmp(eMC_PDD_Plot_table{:,'Energy'},'12 MeV');
 
-% Extract Depth column - all curves will have the same spacing, find the
-% longest one
+%% Save the data as an Excel file
+% Indicate the selection criteria
+select_header = cell(size(select,2),size(eMC_PDD_Plot_table,1)+1);
+for i = 1:size(select,2)
+    select_header(i,1:2) = select{i};
+end
+
+% Extract Depth column
+% All curves will have the same spacing, find the longest one
 Depth_sets = eMC_PDD_Plot_table{:,'X'};
 Depth_length = cellfun(@(x) size(x,1), Depth_sets);
 DepthIndex = find(Depth_length == max(Depth_length));
 Depth = num2cell(cell2mat(eMC_PDD_Plot_table{DepthIndex(1),'X'}));
-xlswrite(Excel_filename,cellstr('Test'),Excel_sheet,'A1')
-xlswrite(Excel_filename,cellstr('Field Size'),Excel_sheet,'A1')
-xlswrite(Excel_filename,cellstr('Depth(cm)'),Excel_sheet,'A2')
-xlswrite(Excel_filename,Depth,Excel_sheet,'A3')
+%pad the depth column
+pad = cell(size(MatchParameters,1)+1,1);
+Depth = [pad;'Depth (cm)'; Depth];
 
+% Collect the dose columns
 key_list = eMC_PDD_Plot_table{:,'key'};
 unique_keys = sort(unique(key_list));
 Index = 1;
-Dose_cell = cell(1);
+Header = cell(size(MatchParameters,1)+2,size(eMC_PDD_Plot_table,1));
+Dose_cell = cell(size(Depth,1),size(eMC_PDD_Plot_table,1));
 for i = 1:size(unique_keys,1)
     KeyIndex = find(strcmp(eMC_PDD_Plot_table{:,'key'},unique_keys{i}));
     for j = 1:size(KeyIndex,1)
-        Header{1,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'FieldSize'});
-        Header{2,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Curve_label'});
+        for k = 1:size(MatchParameters,1)
+            Header{k,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),MatchParameters{k}});
+        end
+        Header{k+1,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'key'});
+        Header{k+2,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Curve_label'});
         Dose = num2cell(cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Y'}));
         %Pad the dose cell array
         if size(Dose,1) > size(Dose_cell,1)
@@ -125,14 +134,17 @@ for i = 1:size(unique_keys,1)
         elseif size(Dose,1) < size(Dose_cell,1)
             Dose{size(Dose_cell,1),1} = '';
         end
-        Dose_cell = [Dose_cell, Dose];
+        Dose_cell(:,Index) = Dose;
         Index = Index +1;
     end
 end
-% remove the extra column from Dose_cell
- Dose_cell = Dose_cell(:,2:end);
- Excel_table = [Header; Dose_cell];
-xlswrite(Excel_filename,Excel_table,Excel_sheet,'B1')
+
+% Merge the headers and data cells
+Excel_table = [select_header; [Depth, [Header; Dose_cell]]];
+% Create the spreadsheet
+Excel_filename = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_PDD_data.xls';
+Excel_sheet = '12 MeV PDDs';
+xlswrite(Excel_filename,Excel_table,Excel_sheet,'A1')
  
 %% Plot the data
 eMC_PDD_Plot_table = sortrows(eMC_PDD_Plot_table,{'key'});
