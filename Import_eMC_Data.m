@@ -23,7 +23,7 @@ function tables = Import_eMC_Data()
 %% Import 21D Measured data
 data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\21D Measured Data\PDD-Profiles\SSD=100cm';
 GridSize = 0.1;
-% Current measured data is already smoothed  and centredin OmniPro
+% Current measured data is already smoothed  and centred in OmniPro
 Center = 'Asymmetric';
 % Center = 'Center';
 Smoothing = 'none';
@@ -75,6 +75,12 @@ for i = 1:length(PDD_Index)
     FieldSizeString = cellstr(Measured_21D_table{PDD_Index(i),'FieldSize'});
     disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
 end
+
+%%%%%%%%%% Identify the profiles
+% select the Profiles 
+Profile_Index = find(strcmp(Measured_21D_table.Type,'Profile'));
+depths_21D = unique(cell2mat(Measured_21D_table.Depth(Profile_Index)));
+directions_21D = unique(Measured_21D_table.Direction(Profile_Index));
 
 %% Import 21A Measured data
 data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\21A Measured data\electron profiles and PDDs for isodose lines';
@@ -130,6 +136,12 @@ for i = 1:length(PDD_Index)
     FieldSizeString = cellstr(Measured_21A_table{PDD_Index(i),'FieldSize'});
     disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
 end
+
+%%%%%%%%%% Identify the profiles
+% select the Profiles 
+Profile_Index = find(strcmp(Measured_21A_table.Type,'Profile'));
+depths_21A = unique(cell2mat(Measured_21A_table.Depth(Profile_Index)));
+directions_21A = unique(Measured_21A_table.Direction(Profile_Index));
 
 %% Import Beam Configuration Data
 Path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\Beam Configuration Data';
@@ -192,11 +204,21 @@ DICOM_data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning
 directory = '21A Measured Model\12MeV';
 data_path = [DICOM_data_path directory];
 
-% Read in Measured PDD Data
-Calculated21A_Measured_PDDs = Extract_PDD(data_path);
+% Read in Calculated PDD Data
+ Calculated21A_Measured_PDDs = Extract_PDD(data_path);
+
+% Read in Calculated Profile Data
+GridSize = 0.1;
+Center = 'Center';
+Smoothing = 'linear';
+% Select the depths
+depths = union(depths_21A, depths_21D);
+directions = union(directions_21A, directions_21D);
+Calculated21A_Measured_Profiles = Extract_Profile(data_path,0,directions{1},depths,GridSize,Center,Smoothing);
 
 % convert to table variable
-Calculated_21A_table = struct2table(Calculated21A_Measured_PDDs);
+Calculated21A_Measured = [Calculated21A_Measured_PDDs; Calculated21A_Measured_Profiles];
+Calculated_21A_table = struct2table(Calculated21A_Measured);
 
 % Correct Field Size
 ApplicatorSize = Calculated_21A_table.applicator;
@@ -219,8 +241,6 @@ Calculated_21A_table.Algorithm = Algorithm;
 
 %%%%%%% normalize and shift the PDDs
 % set the normalization and shift parameters
-GridSize = 0.1;
-Smoothing = 'linear';
 Shift_location = 'R50';
 %TODO select position by energy
 Position = 5.0;
@@ -242,29 +262,41 @@ DICOM_data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning
 directory = 'Golden Beam Model\12MeV';
 data_path = [DICOM_data_path directory];
 
-GoldenBeam_Measured_PDDs = Extract_PDD(data_path);
+% Read in Calculated PDD Data
+GoldenBeam_Calculated_PDDs = Extract_PDD(data_path);
+
+% Read in Calculated Profile Data
+GridSize = 0.1;
+Center = 'Center';
+Smoothing = 'linear';
+% Select the depths
+depths = union(depths_21A, depths_21D);
+directions = union(directions_21A, directions_21D);
+GoldenBeam_Calculated_Profiles = Extract_Profile(data_path,0,directions{1},depths,GridSize,Center,Smoothing);
 
 % convert to table variable
-GoldenBeam_table = struct2table(GoldenBeam_Measured_PDDs);
+GoldenBeam_Calculated = [GoldenBeam_Calculated_PDDs; GoldenBeam_Calculated_Profiles];
+GoldenBeam_Calculated_table = struct2table(GoldenBeam_Calculated);
 
 % Correct Field Size
-ApplicatorSize = GoldenBeam_table.applicator;
+ApplicatorSize = GoldenBeam_Calculated_table.applicator;
 FieldSize = cell(size(ApplicatorSize));
 for i = 1:size(ApplicatorSize,1)
     FieldSize{i} = [num2str(ApplicatorSize(i)) ' x ', num2str(ApplicatorSize(i))];
 end
-GoldenBeam_table.FieldSize = FieldSize;
+GoldenBeam_Calculated_table.FieldSize = FieldSize;
 
 % Add 100 SSD
 SSD = cellstr(strcat(num2str(ones(size(ApplicatorSize))*100),' cm'));
-GoldenBeam_table.SSD = SSD;
+GoldenBeam_Calculated_table.SSD = SSD;
 % Add Algorithm
 Algorithm_string = '21A Measured';
-Algorithm = cell(size(GoldenBeam_table,1),1);
-for i = 1:size(GoldenBeam_table,1)
+Algorithm = cell(size(GoldenBeam_Calculated_table,1),1);
+for i = 1:size(GoldenBeam_Calculated_table,1)
     Algorithm{i} = Algorithm_string;
 end
-GoldenBeam_table.Algorithm = Algorithm;
+GoldenBeam_Calculated_table.Algorithm = Algorithm;
+
 %%%%%%% normalize and shift the PDDs
 % set the normalization and shift parameters
 GridSize = 0.1;
@@ -274,223 +306,21 @@ Shift_location = 'R50';
 Position = 5.0;
 disp('calculated Golden Beam Data');
 % select the PDDS 
-PDD_Index = find(strcmp(GoldenBeam_table.Type,'PDD'));
+PDD_Index = find(strcmp(GoldenBeam_Calculated_table.Type,'PDD'));
 for i = 1:length(PDD_Index)
-    Depth = cell2mat(GoldenBeam_table{PDD_Index(i),'depth'});
-    Dose = cell2mat(GoldenBeam_table{PDD_Index(i),'dose'});
+    Depth = cell2mat(GoldenBeam_Calculated_table{PDD_Index(i),'depth'});
+    Dose = cell2mat(GoldenBeam_Calculated_table{PDD_Index(i),'dose'});
     [ShiftedDepth, NormDose, Shift] = Normalize_PDD(Depth,Dose,GridSize,Smoothing,Shift_location,Position);
-    GoldenBeam_table{PDD_Index(i),'depth'} = {ShiftedDepth};
-    GoldenBeam_table{PDD_Index(i),'dose'} = {NormDose};
-    FieldSizeString = cellstr(GoldenBeam_table{PDD_Index(i),'FieldSize'});
+    GoldenBeam_Calculated_table{PDD_Index(i),'depth'} = {ShiftedDepth};
+    GoldenBeam_Calculated_table{PDD_Index(i),'dose'} = {NormDose};
+    FieldSizeString = cellstr(GoldenBeam_Calculated_table{PDD_Index(i),'FieldSize'});
     disp(['Field Size = ' FieldSizeString ' Shift = ' num2str(Shift)]);
 end
 
-%%
+%% Save the tables
 save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat','*table');
 tables.BeamConfig_table = BeamConfig_table;
 tables.Measured_21A_table = Measured_21A_table;
 tables.Measured_21D_table = Measured_21D_table;
-tables.GoldenBeam_table = GoldenBeam_table;
+tables.GoldenBeam_table = GoldenBeam_Calculated_table;
 tables.Calculated_21A_table = Calculated_21A_table;
-%%
-%
-return
-%%%%%%%%%%%%%%%%%%%%%%%%%% Done to here %%%%%%%%%%%%%%%%%%%
-%
-%
-%
-%% import the profiles
-directory = '21A Measured Model\12MeV';
-data_path = [DICOM_data_path directory];
-Position = 0;
-Direction = 'CrossPlane';
-Depths = [3 8 15];
-Center = 'Asymmetric';
-Smoothing = 'none';
-Calculated_MLC_AC_Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-
-Direction = 'InPlane';
-Depths = [3 8 15];
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-
-Calculated_MLC_AC_Profiles = [Calculated_MLC_AC_Profiles; Profiles];
-clear Profiles;
-
-%% import the Open profiles
-directory = '10X MLC open';
-data_path = [DICOM_data_path directory];
-Position = 0.25;
-Center = 'Center';
-Direction = 'CrossPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AC_Profiles = [Calculated_MLC_AC_Profiles; Profiles];
-clear Profiles;
-
-Position = 0;
-Direction = 'InPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AC_Profiles = [Calculated_MLC_AC_Profiles; Profiles];
-clear Profiles;
-
-%% import the Y_Jaw profiles
-directory = '10X MLC=Y_Jaw';
-data_path = [DICOM_data_path directory];
-Position = 0.25;
-Center = 'Center';
-Direction = 'CrossPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AC_Profiles = [Calculated_MLC_AC_Profiles; Profiles];
-clear Profiles;
-
-Position = 0;
-Direction = 'InPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AC_Profiles = [Calculated_MLC_AC_Profiles; Profiles];
-clear Profiles;
-
-
-
-%% Import PDDs
-
-% % Read in Measured PDD Data
-% Dmax = {'3.0 x 3.0'  2.3; '4.0 x 4.0'  2.4; '6.0 x 6.0' 2.4; ...
-%         '8.0 x 8.0'  2.3; '10.0 x 10.0'  2.3; '20.0 x 20.0'  2.0; ...
-%         '30.0 x 30.0'  1.8};
-% Offset = [0 0];
-%
-% % CalculatedAAA_PDDs = Extract_PDD(DICOM_data_path,GridSize);
-% CalculatedAAA_PDDs = Extract_PDD(DICOM_data_path,GridSize,Offset,Dmax);
-
-%% convert to table variable
-Calculated_MLC_AC_Profiles_table = struct2table(Calculated_MLC_AC_Profiles);
-
-% Identify Type of field from FileName
-PlanNames = Calculated_MLC_AC_Profiles_table.PlanName;
-
-% Extract the last portion of the file name (After MLC in the file name)
-FieldType = cellfun(@(A) sscanf(A,'%*[^C] %*2c %s'),PlanNames,'UniformOutput', false);
-
-% fix the 'Y_Jaw' type Because the '_' causes a subscript as a lable
-FieldType = strrep(FieldType, 'Y_Jaw', 'Y jaw');
-
-% add field type as aVariable to the table
-Calculated_MLC_AC_Profiles_table.FieldType = FieldType;
-
-
-% Convert the variable names to match the measured data
-VariableNames =Calculated_MLC_AC_Profiles_table.Properties.VariableNames;
-% Change 'depth' to 'Depth'
-VariableNames = strrep(VariableNames, 'depth', 'Depth');
-% Change 'direction' to 'Direction'
-VariableNames = strrep(VariableNames, 'direction', 'Direction');
-% Convert the variable names
-Calculated_MLC_AC_Profiles_table.Properties.VariableNames = VariableNames;
-
-% fix the 'open' type
-Calculated_MLC_AC_Profiles_table.FieldType = strrep(Calculated_MLC_AC_Profiles_table.FieldType, 'open', 'Open');
-% fix the 'CrossPlane' direction
-Calculated_MLC_AC_Profiles_table.Direction = strrep(Calculated_MLC_AC_Profiles_table.Direction, 'CrossPlane', 'Crossline');
-% fix the 'InPlane' direction
-Calculated_MLC_AC_Profiles_table.Direction = strrep(Calculated_MLC_AC_Profiles_table.Direction, 'InPlane', 'Inline');
-
-%% Import Calculated 10X AAA MLC Plans
-
-DICOM_data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\TrueBeam Commissioning\MLC Defined Fields\AAA Calculations\';
-GridSize = 0.1;
-
-% import the profiles
-
-% import the Offset profiles
-directory = '10X MLC Offset';
-data_path = [DICOM_data_path directory];
-Position = 4.5;
-Direction = 'CrossPlane';
-Depths = [3 8 15];
-Center = 'Asymmetric';
-Smoothing = 'none';
-Calculated_MLC_AAA_Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-
-Direction = 'InPlane';
-Depths = [3 8 15];
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-
-Calculated_MLC_AAA_Profiles = [Calculated_MLC_AAA_Profiles; Profiles];
-clear Profiles;
-
-%% import the Open profiles
-directory = '10X MLC open';
-data_path = [DICOM_data_path directory];
-Position = 0.25;
-Center = 'Center';
-Direction = 'CrossPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AAA_Profiles = [Calculated_MLC_AAA_Profiles; Profiles];
-clear Profiles;
-
-Position = 0;
-Direction = 'InPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AAA_Profiles = [Calculated_MLC_AAA_Profiles; Profiles];
-clear Profiles;
-
-%% import the Y_Jaw profiles
-directory = '10X MLC=Y_Jaw';
-data_path = [DICOM_data_path directory];
-Position = 0.25;
-Center = 'Center';
-Direction = 'CrossPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AAA_Profiles = [Calculated_MLC_AAA_Profiles; Profiles];
-clear Profiles;
-
-Position = 0;
-Direction = 'InPlane';
-Profiles = Extract_Profile(data_path,Position, Direction, Depths,GridSize,Center,Smoothing);
-Calculated_MLC_AAA_Profiles = [Calculated_MLC_AAA_Profiles; Profiles];
-clear Profiles;
-
-
-
-%% Import PDDs
-
-% % Read in Measured PDD Data
-% Dmax = {'3.0 x 3.0'  2.3; '4.0 x 4.0'  2.4; '6.0 x 6.0' 2.4; ...
-%         '8.0 x 8.0'  2.3; '10.0 x 10.0'  2.3; '20.0 x 20.0'  2.0; ...
-%         '30.0 x 30.0'  1.8};
-% Offset = [0 0];
-%
-% % CalculatedAAA_PDDs = Extract_PDD(DICOM_data_path,GridSize);
-% CalculatedAAA_PDDs = Extract_PDD(DICOM_data_path,GridSize,Offset,Dmax);
-
-%% convert to table variable
-Calculated_MLC_AAA_Profiles_table = struct2table(Calculated_MLC_AAA_Profiles);
-
-% Identify Type of field from FileName
-PlanNames = Calculated_MLC_AAA_Profiles_table.PlanName;
-
-% Extract the last portion of the file name (After MLC in the file name)
-FieldType = cellfun(@(A) sscanf(A,'%*[^C] %*2c %s'),PlanNames,'UniformOutput', false);
-
-% fix the 'Y_Jaw' type Because the '_' causes a subscript as a lable
-FieldType = strrep(FieldType, 'Y_Jaw', 'Y jaw');
-
-% add field type as aVariable to the table
-Calculated_MLC_AAA_Profiles_table.FieldType = FieldType;
-
-
-% Convert the variable names to match the measured data
-VariableNames =Calculated_MLC_AAA_Profiles_table.Properties.VariableNames;
-% Change 'depth' to 'Depth'
-VariableNames = strrep(VariableNames, 'depth', 'Depth');
-% Change 'direction' to 'Direction'
-VariableNames = strrep(VariableNames, 'direction', 'Direction');
-% Convert the variable names
-Calculated_MLC_AAA_Profiles_table.Properties.VariableNames = VariableNames;
-
-% fix the 'open' type
-Calculated_MLC_AAA_Profiles_table.FieldType = strrep(Calculated_MLC_AAA_Profiles_table.FieldType, 'open', 'Open');
-
-% fix the 'CrossPlane' direction
-Calculated_MLC_AAA_Profiles_table.Direction = strrep(Calculated_MLC_AAA_Profiles_table.Direction, 'CrossPlane', 'Crossline');
-% fix the 'InPlane' direction
-Calculated_MLC_AAA_Profiles_table.Direction = strrep(Calculated_MLC_AAA_Profiles_table.Direction, 'InPlane', 'Inline');

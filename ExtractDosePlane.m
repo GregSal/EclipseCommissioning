@@ -1,11 +1,10 @@
 %% Extract dose plane data
-% This function recursively scans a directory tree and produces a set of
-% dose data in the specified plane from all of the DICOM dose files found
+% This extracts the dose data in the specified plane from the DICOM dose
+% file specified
 %%
-function DoseData = ExtractDosePlane(DICOM_data_path, Position, Plane)
+function DoseData = ExtractDosePlane(DICOM_dose_file, Position, Plane)
 % function DoseData = ExtractDosePlane(DICOM_data_path, DICOM_data_path)
-% DICOM_data_path  is the top directory to be searched for DICOM dose and
-% plan files
+% DICOM_dose_file is the DICOM dose file to extract data from
 %
 % Position is the position in cm along the plane to be extracted
 % Plane is Orientation of the dose plane to be extracted.  It can be one of

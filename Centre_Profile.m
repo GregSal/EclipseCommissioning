@@ -97,16 +97,22 @@ if DoCenter
     delta = diff(RoughNormDose);
     
     % Identify the regions for the two peaks which correspond to the field edges
-    X1 = find(delta>5);
-    X2 = find(delta<-5);
+    X1 = find(delta>mean(abs(delta))*5);
+    X2 = find(delta<-mean(abs(delta))*5);
     
-    % find the 50% dose point
-    D50(1) = interp1(RoughNormDose(X1),Distance(X1),50,'linear');
-    D50(2) = interp1(RoughNormDose(X2),Distance(X2),50,'linear');
-    
-    % The centre offset is calculated from an average of these two distances
-    shift = (D50(1)+ D50(2))/2;
-    
+    % If field edges cannot be identified don't centre
+    if size(X1,2)>2 && size(X2,2)>2 && ...
+            min(Distance(X1)) < 50 && max(Distance(X1)) > 50 && ...
+            min(Distance(X2)) < 50 && max(Distance(X2)) > 50
+        % find the 50% dose point
+        D50(1) = interp1(RoughNormDose(X1),Distance(X1),50,'linear');
+        D50(2) = interp1(RoughNormDose(X2),Distance(X2),50,'linear');
+
+        % The centre offset is calculated from an average of these two distances
+        shift = (D50(1)+ D50(2))/2;
+    else
+        shift = 0;
+    end
     % the distance position is moved to centre the data
     ShiftedDistance = Distance - shift;
 else

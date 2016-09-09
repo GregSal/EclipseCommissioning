@@ -16,6 +16,11 @@ function PDD_Data = Extract_PDD(DICOM_data_path,Offset)
 %     Offset          =   Optional, a 2 element array [x, z] indicating the
 %                         shift from the central axis for the depth dose
 %                         curve.
+%     Smoothing       =   The desired smoothing method for profiles
+%                         can be one of 'linear', 'sgolay', 'pchip' or
+%                         'none'  If spacing is given, smoothing is
+%                         required. Interpolation is required for
+%                         smoothing.
 %
 %   Output Arguments
 %     PDD_Data        =   A structured array consisting of the following fields:
@@ -85,7 +90,7 @@ else
     DO_Shift = false;
 end
 
-%% Extract Calculated DICOM dose date
+%% Extract Calculated DICOM dose data
 
 % Extract the cross-plane data passing through the isocentre
 DoseData = ExtractDosePlane(DICOM_data_path, Z_Offset, 'xy');
@@ -135,9 +140,9 @@ for i=1:number_of_files;
     PDD_Data(PDD_Index).Energy = [num2str(DoseData(i).Energy) ' MeV'];
     PDD_Data(PDD_Index).SSD = DoseData(i).SSD;
     PDD_Data(PDD_Index).plane = Z_Offset;
-    PDD_Data(PDD_Index).distance = X_Offset;
     PDD_Data(PDD_Index).direction = 'Beam';
     PDD_Data(PDD_Index).Type = 'PDD';
+    PDD_Data(PDD_Index).distance = X_Offset;
     PDD_Data(PDD_Index).depth = y;
     PDD_Data(PDD_Index).dose = Dose;
     try

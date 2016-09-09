@@ -19,6 +19,7 @@ Calculated_21A_table = ImportedTables.Calculated_21A_table;
 % table_variables = variables(table_index);
 
 %TODO Add a sorting column
+%TODO can't use X and Y for Profiles
 %% Select X & Y columns for PDDs and add Curve Labels
  
 % 21D measured
