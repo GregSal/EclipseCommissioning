@@ -2,18 +2,41 @@
 % This function reads in dose data from a given file
 
 %%
-function [Dose_data, coordinates] = ReadDose(DoseFile)
-%function [doseinfo,Dose_data] = ReadDose(FileName)
-% This function reads in dose data from a given file
+function [Dose_data, coordinates] = ReadDose(DoseFile, isocentre)
+% [Dose_data, coordinates] = ReadDose(DoseFile, isocentre)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Created by Greg Salomons
+%    ReadDose Extracts the dose data from the specified DICOM file,
+%    converts it to floating poing values in cGy and returns this dose data
+%    along with coordinates in cm, with the isocentre at the origin.
+%
+%   Input Arguments
+%     DICOM_dose_file    =  Path and filename for the DOCOM Dose Data
+%
+%     isocentre          =  A 3 element array [x, y, z] indicating the DICOM
+%                           coordinates of the beam isocentre.
+%
+%   Output Arguments
+%     Dose_data        =   A 3D array of dose values in cGy.
+%
+%     coordinates      =   A structured array consisting of the following
+%                          fields: 
+%                          x     = The x coordinates in cm.
+%                          y     = The x coordinates in cm.
+%                          z     = The x coordinates in cm.
+%                          The origin is located at the field isocentre.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %% load the dose info
 
 % Extract DICOM metadata from RT dose file
-doseinfo = dicominfo(DoseFile.name);
+doseinfo = dicominfo(DoseFile);
   
 %% Extract DICOM dose data from the dose file
 % Extract DICOM image data from RT dose file
-dose = dicomread(DoseFile.name);
+dose = dicomread(DoseFile);
 
 % Initialize dose sum
 dose = squeeze(dose); % remove the 4D singleton dimension
@@ -21,23 +44,7 @@ dose = squeeze(dose); % remove the 4D singleton dimension
 % Convert image data to actual dose values in cGy
 Dose_data = double(dose)*doseinfo.DoseGridScaling*100;
 
-% TODO make normalization an option
-% renormalize dose to dose for one fraction
-%Dose_data = Dose_data/DoseFile.Fractions;
-
-% renormalize dose to MU of 100
-%Dose_data = Dose_data/DoseFile.MU*100;
-
-% Select only those voxels withing the field (i.e. dose > 50 cGy)
-%     FieldPixels = Dose_data>50;
-
-% TODO
-% Rotate Coordinate system so that depth is vertical
-% Use Interpolate to generate new plotting data
-
-%% Get coordinate information from plan and dose info
-% Get coordinates of isocentre in DICOM frame of reference
-isocentre = DoseFile.isocentre;
+%% Get coordinate information from the dose info
 % Extract dose slice pixel spacing data
 pixspacing = doseinfo.PixelSpacing;
 % get the DICOM origin coordinates

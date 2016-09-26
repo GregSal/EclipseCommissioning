@@ -30,11 +30,11 @@ end
 %
 % Define the structure
 Dose_files = struct(...
-    'Patient',{},'PatientID',{},'Plan_Time',{},'name',{},'plan_name',{},...
+    'Patient',{},'PatientID',{},'Plan_Time',{},'dose_file',{},'plan_file',{},'plan_name',{},...
     'plan_description',{},'energy',[],'applicator',{},'isocentre',[],'MU',[]);
 
-% Set the correct dimensions
-Dose_files(size(Plan_files,1)).name ={};
+% Set the minimum number of expected dose files
+Dose_files(size(Plan_files,1)).Patient ={};
 
 % Flip the variable so that it is the same as Plan_files
 Dose_files = Dose_files';
@@ -48,48 +48,52 @@ for i=1:size(Plan_files,1)  % Examine all plan files
     %
     %% Get plan data and Dose File
     %
-    [plan_data, Dose_file] = read_plan_data(Plan_files{i});
+    [plan_data, Dose_file_list, Beam_Reference] = read_plan_data(Plan_files{i});
     %
-    %% Look for one non Zero MU field
-    % FIX ME  There is not test for an empty file return
-    MU_list =[plan_data.Beams.MUs]';
-    testField = find(MU_list ~= 0);
-    if length(testField)>1
-        message = 'More than 1 non-zero MU field. Using 1st field';
-        warning('Get_plan_list:Invalidplan',message);
-        testField = testField(1);
+    %% Check that dose files were found
+    if (isempty(plan_data) || isempty(Dose_file_list))
+        message = 'No Dose data files found';
+        warning('Get_plan_list:InvalidDoseFile',message);
+        % Return an empty list
+        Dose_files = {};
+        return
     end
-    %% test the plan data
+    %% Save the relevant Plan info for each dose file
     %
-    if (not(isempty(plan_data) & isempty(Dose_file)))  % Test that both Plan and Dose information retrieved
-        %% Save the Plan info of interest from the first beam
+    for j=1:size(Dose_file_list,2)
+        %% Save the General Plan info
         %
         Dose_files(index).Patient = plan_data.Patient_name;
         Dose_files(index).PatientID = plan_data.Patient_ID;
         Dose_files(index).Plan_Time = plan_data.Plan_Time;
-        Dose_files(index).name = Dose_file;
+        Dose_files(index).dose_file = Dose_file_list{j};
         Dose_files(index).plan_file = Plan_files{i};
         Dose_files(index).plan_name = plan_data.Plan_name;
         Dose_files(index).plan_description = plan_data.Plan_description;
-        Dose_files(index).FieldName = plan_data.Beams(testField).Field_Name;
-        Dose_files(index).energy = plan_data.Beams(testField).Beam_Energy;
-        Dose_files(index).isocentre = plan_data.Beams(testField).Isocentre;
-        Dose_files(index).MU = plan_data.Beams(testField).MUs;
+        % Find the matching Beam Data for the dose file
+        Field_Number =[plan_data.Beams.Field_Number]';
+        MatchField = find(Field_Number == Beam_Reference(j));
+        Dose_files(index).FieldName = plan_data.Beams(MatchField).Field_Name;
+        Dose_files(index).energy = plan_data.Beams(MatchField).Beam_Energy;
+        Dose_files(index).isocentre = plan_data.Beams(MatchField).Isocentre;
+        Dose_files(index).MU = plan_data.Beams(MatchField).MUs;
         Dose_files(index).Fractions = plan_data.Fractions;
-        Dose_files(index).Gantry_Angle = plan_data.Beams(testField).Gantry_Angle;
-        Dose_files(index).Collimator_angle = plan_data.Beams(testField).Collimator_angle;
-        Dose_files(index).Couch_angle = plan_data.Beams(testField).Couch_angle;
-        Dose_files(index).SSD = plan_data.Beams(testField).SSD;
+        Dose_files(index).Gantry_Angle = plan_data.Beams(MatchField).Gantry_Angle;
+        Dose_files(index).Collimator_angle = plan_data.Beams(MatchField).Collimator_angle;
+        Dose_files(index).Couch_angle = plan_data.Beams(MatchField).Couch_angle;
+        Dose_files(index).SSD = plan_data.Beams(MatchField).SSD;
+        % Add electron applicator and insert data if available
         try
-            Dose_files(index).applicator = str2num(plan_data.Beams(testField).Applicator(2:end)); %#ok<ST2NM>
-            Dose_files(index).insertsize = max(plan_data.Beams(testField).InsertShape(:));
+            Dose_files(index).applicator = str2num(plan_data.Beams(MatchField).Applicator(2:end)); %#ok<ST2NM>
+            Dose_files(index).insertsize = plan_data.Beams(MatchField).InsertShape;
+            Dose_files(index).insertname = plan_data.Beams(MatchField).InsertName;
         catch  %#ok<CTCH>
             % if no applicator do not create this applicator field
-            % create a field size parameter
         end
+        % create a field size parameter
         try
-            x_jaws = plan_data.Beams(testField).x_jaw;
-            y_jaws = plan_data.Beams(testField).y_jaw;
+            x_jaws = plan_data.Beams(MatchField).x_jaw;
+            y_jaws = plan_data.Beams(MatchField).y_jaw;
             if (x_jaws(2) == -x_jaws(1))
                 X_jaw_string = num2str(x_jaws(2)-x_jaws(1),'%4.1f');
             else
