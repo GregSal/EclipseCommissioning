@@ -1,5 +1,5 @@
 function [AdjustedDepth, FinalDose, PDD_analysis] = Normalize_PDD(Depth,Dose,Spacing,Smoothing,Shift_location,Position)
-% [AdjustedDepth, RenormalizedDose, Shift] = Normalize_PDD(Depth,Dose,Spacing,Smoothing,Shift_location,Position)
+% [AdjustedDepth, RenormalizedDose, PDD_analysis] = Normalize_PDD(Depth,Dose,Spacing,Smoothing,Shift_location,Position)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Created by Greg Salomons
 %    Normalize_PDD returns the depth dose curve with depth points Spacing
@@ -8,12 +8,12 @@ function [AdjustedDepth, FinalDose, PDD_analysis] = Normalize_PDD(Depth,Dose,Spa
 %    It also includes analysis data on the PDD Curve. 
 %
 %   Input Arguments
-%     Depth            =   The distance (x) coordinates of the profile
+%     Depth            =   The depth (x) coordinates of the PDD
 %
-%     Dose             =   The relative dose for the profile
+%     Dose             =   The relative dose for the PDD
 %
-%     Spacing          =   Optional, The desired distance spacing for the
-%                          output profile.  if absent no interpolation is
+%     Spacing          =   Optional, The desired depth spacing for the
+%                          output PDD.  if absent no interpolation is
 %                          done. 
 %     Smoothing        =   The desired smoothing method for profiles
 %                          can be one of 'linear', 'sgolay', 'pchip' or
@@ -90,7 +90,7 @@ else
         if (nargin >3)
             DoInterpolation = true;
             % Check for Smoothing
-            if strcmpi(Shift_location,'sgolay')
+            if strcmpi(Smoothing,'sgolay')
                 SmoothingType = 'sgolay'; % Use smoothing from curve fitting toolbox
             elseif strcmpi(Smoothing,'pchip')
                 SmoothingType = 'pchip'; % Use Standrd Matlab smoothing
@@ -112,7 +112,6 @@ else
                     end
                 else
                     DoShift = false;
-                    Shift = 0;
                 end
             end
         else
@@ -133,28 +132,31 @@ InterpDepth = MinDepth:0.05:MaxDepth;
 InterpDose = interp1(DoseRange,DoseRegion,InterpDepth,'pchip');
 dmax_Dose = max(InterpDose);
 PDD_analysis.dmax_Dose = dmax_Dose;
-PDD_analysis.R100 = InterpDepth(InterpDose==dmax_Dose);
+PDD_analysis.R100 = mean(InterpDepth(InterpDose==dmax_Dose));
 %Redo-normalization with interpolated Dmax
 RenormalizedDose = Dose/dmax_Dose*100;
 
 %% Find R50
 %select data past buildup region
 BuildDownIndex = Depth > PDD_analysis.R100;
-DoseIndexLow = RenormalizedDose > 30;
-DoseIndexHigh = RenormalizedDose < 70;
+DoseIndexLow = RenormalizedDose > 40;
+DoseIndexHigh = RenormalizedDose < 60;
 DoseIndex = BuildDownIndex & DoseIndexLow & DoseIndexHigh;
 DoseRegion = RenormalizedDose(DoseIndex);
 DoseRange = Depth(DoseIndex);
-PDD_analysis.R50 = interp1(DoseRegion,DoseRange,50,'linear');
+linear_fit = polyfit(DoseRegion,DoseRange,1);
+PDD_analysis.R50 = 50*linear_fit(1)+linear_fit(2);
 
 %% Apply any Depth shifts
 if (DoShift)
     if (ShiftDmax)
         % shift the Depths to line up Dmax
         PDD_analysis.depth_shift =  Position - PDD_analysis.R100;
+        PDD_analysis.R50 = PDD_analysis.R50 - PDD_analysis.depth_shift;
     else
         % Shift to R50
         PDD_analysis.depth_shift =  Position - PDD_analysis.R50;
+        PDD_analysis.R100 = PDD_analysis.R100-PDD_analysis.depth_shift;
     end
 else
     PDD_analysis.depth_shift = 0;
@@ -175,8 +177,19 @@ else
     FinalDose = RenormalizedDose;
     AdjustedDepth = ShiftedDepth;
 end
-%% Find Build_up_95
+%% Find Surface Dose
 BuildUpIndex = AdjustedDepth < PDD_analysis.R100;
+DoseIndexLow = FinalDose < 95;
+DoseIndex = BuildUpIndex & DoseIndexLow;
+DoseRegion = FinalDose(DoseIndex);
+DoseRange = AdjustedDepth(DoseIndex);
+if size(DoseRange,1) > 2
+    PDD_analysis.SurfaceDose = interp1(DoseRange,DoseRegion,0,'linear','extrap');
+else
+    PDD_analysis.SurfaceDose = NaN;
+end
+    
+%% Find Build_up_95
 DoseIndexLow = FinalDose > 85;
 DoseIndexHigh = FinalDose < 100;
 DoseIndex = BuildUpIndex & DoseIndexLow & DoseIndexHigh;
@@ -192,7 +205,6 @@ DoseRegion = FinalDose(DoseIndex);
 DoseRange = AdjustedDepth(DoseIndex);
 PDD_analysis.R95 = interp1(DoseRegion,DoseRange,95,'linear');
 %% Find  R90
-BuildDownIndex = AdjustedDepth > PDD_analysis.R100;
 DoseIndexLow = FinalDose > 80;
 DoseIndexHigh = FinalDose < 100;
 DoseIndex = BuildDownIndex & DoseIndexLow & DoseIndexHigh;
@@ -200,7 +212,6 @@ DoseRegion = FinalDose(DoseIndex);
 DoseRange = AdjustedDepth(DoseIndex);
 PDD_analysis.R90 = interp1(DoseRegion,DoseRange,90,'linear');
 %% Find  R80
-BuildDownIndex = AdjustedDepth > PDD_analysis.R100;
 DoseIndexLow = FinalDose > 60;
 DoseIndexHigh = FinalDose < 90;
 DoseIndex = BuildDownIndex & DoseIndexLow & DoseIndexHigh;

@@ -31,10 +31,24 @@ function MeasuredData = read_measured_data(File_name, Center, GridSize, Smoothin
 %
 %   Output Arguments
 %     MeasuredData     =   A structured array sonsisting of the following fields:
+%                          FilePath   = The directory in which the measured
+%                                       data file is located. 
+%                          FileName     The name of the file in which the
+%                                       measured data file is located. 
 %                          Type       = PDD or Profile depending on the
 %                                       type of data curve
-%                          FieldSize  = The field Size info extracted from
-%                                       the measurement file's header
+%                          Linac      = A string indicating the treatment
+%                                       unit the measurements were done on,
+%                                       based on the measurement file's
+%                                       header.
+%                          GantryAngle= The gantry angle based on the
+%                                       measurement file's header.
+%                          FieldSize  = A field Size string taken from the
+%                                       measurement file's header and
+%                                       converted to cm 
+%                          EquivSquare= The equivalent square field size
+%                                       based on the field size.
+%                          SSD        = A string indicating the SSD in cm.
 %                          Energy     = The Beam Energy extracted from
 %                                       the measurement file's header
 %                          Parameters = A structure variable containing a
@@ -82,7 +96,7 @@ end
 
 data=1;
 Data_index = 1;
-
+MeasuredData = [];
 %% Open The file
 fid = fopen(File_name);
 %% Read each scan  from the File
@@ -112,8 +126,37 @@ while(not(isempty(data)))
     end
     % Store the path and filename used
     [Path, DataName] = fileparts(File_name);
-    MeasuredData(Data_index).Path = Path; %#ok<*AGROW>
+    MeasuredData(Data_index).FilePath = Path; %#ok<*AGROW>
     MeasuredData(Data_index).FileName = DataName;
+    
+    % Extract the field size numbers and convert from mm to cm
+    field_size = scan_data.field_size;
+    expr = '^\s*(\d+)\s*[x]\s*(\d+)\s*[m]*\s*$';
+    x = str2double(regexprep(field_size,expr,'$1'))/10;
+    y = str2double(regexprep(field_size,expr,'$2'))/10;
+    % calculate equivalent square
+    EqSq = (2*x*y)/(x+y);
+    % Generate a field size string
+    FieldSizeString = [num2str(x) ' x ' num2str(y)];
+    MeasuredData(Data_index).FieldSize = FieldSizeString;
+    MeasuredData(Data_index).EquivSquare = EqSq;
+
+    % Add the energy gantry angle and scan direction
+    MeasuredData(Data_index).Energy = scan_data.energy;
+    MeasuredData(Data_index).GantryAngle = str2double(scan_data.GantryAngle);
+    MeasuredData(Data_index).Direction = scan_data.CurveType;
+
+    % Extract the SSD and convert from mm to cm
+    SSD_data = scan_data.SSD;
+    expr = '^\s*(\d+)\s*[m]*\s*$';
+    SSD = str2double(regexprep(SSD_data,expr,'$1'))/10;
+    SSD_string = [num2str(SSD) ' cm'];
+    MeasuredData(Data_index).SSD = SSD_string;
+
+    % Identify the Linac
+    Linac = strtrim(strrep(scan_data.TreatmentUnit, 'Accelerator', ''));
+    MeasuredData(Data_index).Linac = Linac;
+
     % test to see if the curve is a profile or a PDD
     % 1 is inplane 2 is crossplane
     if or(col == 1,col == 2)
@@ -155,13 +198,10 @@ while(not(isempty(data)))
         else
             [distance, Dose] = Centre_Profile(Distance(Inc), DoseData(I(Inc)));
         end
+        
         % Add the profile to the combined data set
         MeasuredData(Data_index).Type = 'Profile';
         MeasuredData(Data_index).Depth = Depth;
-        MeasuredData(Data_index).FieldSize = scan_data.field_size;
-        MeasuredData(Data_index).Energy = scan_data.energy;
-        MeasuredData(Data_index).Direction = scan_data.CurveType;
-        MeasuredData(Data_index).Parameters = scan_data;
         MeasuredData(Data_index).Distance=distance;
         MeasuredData(Data_index).Dose=Dose;
         Data_index = Data_index+1;
@@ -214,13 +254,14 @@ while(not(isempty(data)))
         norm = max(PDD(:));
         RenormPDD = (PDD/norm)*100;
         
+        %match dimensions
+        if size(depth) ~= size(RenormPDD)
+            RenormPDD = shiftdim(RenormPDD,1);
+        end
+        
         % Store the data
         MeasuredData(Data_index).Type = 'PDD';
-        MeasuredData(Data_index).FieldSize = scan_data.field_size;
-        MeasuredData(Data_index).Energy = scan_data.energy;
         MeasuredData(Data_index).Distance=OffsetDistance;
-        MeasuredData(Data_index).Direction = scan_data.CurveType;
-        MeasuredData(Data_index).Parameters = scan_data;
         MeasuredData(Data_index).Depth=depth;
         MeasuredData(Data_index).Dose=RenormPDD';
         Data_index = Data_index+1;

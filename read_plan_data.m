@@ -1,8 +1,11 @@
 function [Plan_data, Dose_file_list, Beam_Reference] = read_plan_data(plan_file)
-% function [Plan_data, Dose_file] = read_plan_data(plan_file)
+% function [Plan_data, Dose_file_list, Beam_Reference] = read_plan_data(plan_file)
+% function Plan_data = read_plan_data(plan_file)
 % This function reads Plan info from a DICOM RT Plan file and looks for all
 % coresponding Dose files the Dose file name must be in the form RD*.dcm
 % plan_file must be the full path to the file
+% For each dose file in Dose_file_list Beam_Reference Field_ID number in
+% the plan
 
 
 load Months Months; % List of month names
@@ -188,7 +191,7 @@ for i = 1:Plan_data.Number_of_Beams
     %% Get Electron Plan Data
     if (strcmp(Plan_data.Beams(i).Radiation_Type,'ELECTRON'))  % If the Radiation Type is Electrons
         % Get the applicator
-        Plan_data.Beams(i).Applicator = Plan_Info.BeamSequence.(['Item_' int2str(i)]).ApplicatorSequence.Item_1.ApplicatorID;
+        Plan_data.Beams(i).Applicator = Plan_Info.BeamSequence.(['Item_' int2str(i)]).ApplicatorSequence.Item_1.ApplicatorID; %%%% Why not use Beam_data????
         % Get the electron insert shape (a single block)
         if (isfield(Beam_data, 'BlockSequence')) % test for presence of Electron insert
             Shape =  Beam_data.BlockSequence.Item_1.BlockData./10;

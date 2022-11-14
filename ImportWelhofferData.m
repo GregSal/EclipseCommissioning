@@ -32,10 +32,24 @@ function  MeasuredData = ImportWelhofferData(data_path, Center, GridSize, Smooth
 %
 %   Output Arguments
 %     MeasuredData     =   A structured array sonsisting of the following fields:
+%                          FilePath   = The directory in which the measured
+%                                       data file is located. 
+%                          FileName     The name of the file in which the
+%                                       measured data file is located. 
 %                          Type       = PDD or Profile depending on the
 %                                       type of data curve
-%                          FieldSize  = The field Size info extracted from
-%                                       the measurement file's header
+%                          GantryAngle= The gantry angle based on the
+%                                       measurement file's header.
+%                          Linac      = A string indicating the treatment
+%                                       unit the measurements were done on,
+%                                       based on the measurement file's
+%                                       header.
+%                          FieldSize  = A field Size string taken from the
+%                                       measurement file's header and
+%                                       converted to cm 
+%                          EquivSquare= The equivalent square field size
+%                                       based on the field size.
+%                          SSD        = A strin indicating the SSD in cm.
 %                          Energy     = The Beam Energy extracted from
 %                                       the measurement file's header
 %                          Parameters = A structure variable containing a

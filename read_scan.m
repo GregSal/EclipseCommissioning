@@ -104,6 +104,19 @@ else
     scan_info.TreatmentUnit = Value;
 end
 
+%% Get Gantry Angle
+SearchParameter = 'Gantry angle';
+ParameterIndex = strncmp(ParameterDescription, SearchParameter,length(SearchParameter));
+Value =  ParameterValues{ParameterIndex};
+
+% test for no beam description
+%TODO Test for multiple Values
+if isempty(Value)
+        scan_info.GantryAngle = 'Unidentified';
+else
+    scan_info.GantryAngle = Value;
+end
+
 %% Read Variable Names
 Variables = textscan(fid, VariableSpec, 1, 'Delimiter', delimiter); %#ok<NASGU>
 

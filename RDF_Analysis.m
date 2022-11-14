@@ -1,4 +1,13 @@
-function RDF_table = RDF_Analysis(DICOM_data_path)
+function RDF_table = RDF_Analysis()
+DICOM_data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\TR2 Commissioning\Electrons\Eclipse Calculated Plan Data\SSD 110';
+data_path = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\TR2 Commissioning\Electrons\RDF Tables\Calculated RDF';
+matlab_file = 'SSD110Calculated_electron_RDF_data.mat';
+excel_file = 'SSD110Calculated_electron_RDF_data.xls';
+SSD = '110 cm';
+
+% matlab_file = 'SSD110_electron_RDF_data.mat';
+% excel_file = 'SSD110_electron_RDF_data.xls';
+% SSD = '110 cm';
 % RDF_table = RDF_Analysis(DICOM_data_path)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Created by Greg Salomons
@@ -44,7 +53,7 @@ function RDF_table = RDF_Analysis(DICOM_data_path)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Check the number of input arguments (Minimum 1 Maximum 1)
-narginchk(1, 1)
+% narginchk(1, 1)
 
 %% Get the list of DICOM dose files and corresponding data
 %TODO Find a way to extract the calculation algorithm
@@ -63,7 +72,7 @@ RDF_Data = struct('Path', {},'DoseFileName', {}, 'PlanName', {}, ...
     'output', {});
 
 % Set the correct dimensions
-number_of_files = size(Beam_data,1);
+number_of_files = size(Beam_data(:),1);
 RDF_Data(number_of_files).Path = {};
 
 % Flip the variable so that it is the same as Dose_files
@@ -125,12 +134,12 @@ for i=1:number_of_files;
     
     try
         if Beam.SSD == ''
-            RDF_Data(RDF_Index).SSD = '100 cm';
+            RDF_Data(RDF_Index).SSD = SSD;
         else
             RDF_Data(RDF_Index).SSD = [num2str(Beam.SSD) ' cm'];
         end
     catch 
-        RDF_Data(RDF_Index).SSD = '100 cm';
+        RDF_Data(RDF_Index).SSD = SSD;
     end
     RDF_Data(RDF_Index).Field_x = x;
     RDF_Data(RDF_Index).Field_y = y;
@@ -169,12 +178,9 @@ end
 RDF_table.RDF = RDF';
 
 %% Save the table
-data_path = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\Output Factors';
-matlab_file = 'electron_RDF_data.mat';
 save([data_path '\' matlab_file],'RDF_table');
 
 % Write to spreadsheet
-excel_file = 'electron_RDF_data.xls';
 vars = {'Path','DoseFileName','PlanName','Algorithm','FieldName','Energy', ...
         'Applicator', 'Field_x','Field_y','Field_diam','FieldSize','SSD', ...
         'EqSq','MUs','R100','dmax_Dose','output','RDF'};

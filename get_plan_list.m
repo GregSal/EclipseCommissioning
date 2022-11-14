@@ -9,7 +9,7 @@ function Dose_files=get_plan_list(DICOM_path)
 % it uses the functions:
 % dir_scan and read_plan_data
 
-%% Get list of dose files
+%% Get list of plan files
 
 % define the DICOM Plan search string
 scan_string = 'RP*.dcm';

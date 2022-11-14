@@ -23,7 +23,7 @@ function DoseData = ExtractDosePlane(DICOM_dose_file, Isocentre, Position, Plane
 %                           sup to inf.
 %
 %   Output Arguments
-%     PDD_Data         =   A structured array consisting of the following fields:
+%     DoseData         =   A structured array consisting of the following fields:
 %                          x     = The x coordinates for the dose plane.
 %                          y     = The y coordinates for the dose plane.
 %                          z     = The z coordinates for the dose plane.

@@ -1,404 +1,106 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Created by Greg Salomons
+%    Analyze_eMC_Data imports groups of measured and calculated data,
+%    creates graphs and comparison charts and exports data to excel
+%    spreadsheets.
+%    Each section is intended to import and analyze a seperate group of
+%    data.  The script is continuously expanded as more data is analyzed
+%    and can often contain unused sections of code at the end from previous
+%    work.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% initialize parameters and paths
+% Set the base data path
+data_path = '\\dkphysicspv1\e$\Gregs_Work\Gregs_Data\Eclipse Commissioning Data\eMC V13.6 Commissioning Data\';
 
-%% Import Data
-ImportedTables       = Import_eMC_Data();
+% Set the base path for saving data and analysis
+save_path = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\';
 
-% Extract data from structure
-BeamConfig_table     = ImportedTables.BeamConfig_table;
-Measured_21A_table   = ImportedTables.Measured_21A_table;
-Measured_21D_table   = ImportedTables.Measured_21D_table;
-GoldenBeam_table     = ImportedTables.GoldenBeam_table;
-Calculated_21A_table = ImportedTables.Calculated_21A_table;
+%%% Set the basic import parameters
+%  This sets the basic import_parameters structure. It can be copied and
+%  modified for individual groups.
 
-%TODO save imported data tables
+% Set the measured PDD parameters
+import_parameters.measured.PDD.GridSize = 0.03;
+import_parameters.measured.PDD.Smoothing = 'sgolay';
+import_parameters.measured.PDD.Shift_location = 'R50';
+
+% Set the measured profile parameters
+% Current measured profiles are already smoothed and centred in OmniPro
+import_parameters.measured.profile.GridSize = 0.03;
+import_parameters.measured.profile.Center = 'Asymmetric';
+import_parameters.measured.profile.Smoothing = 'none';
+
+% Set the calculated PDD parameters
+import_parameters.calculated.PDD.GridSize = 0.03;
+import_parameters.calculated.PDD.Smoothing = 'sgolay';
+import_parameters.calculated.PDD.Shift_location = 'R50';
+
+% Set the calculated profile parameters
+import_parameters.calculated.profile.GridSize = 0.1;
+import_parameters.calculated.profile.Center = 'Center';
+import_parameters.calculated.profile.Smoothing = 'linear';
+
+
+%% Import High Accuracy Open Square Fields
+description = 'High Accuracy Open Square Fields';
+
+% Import 21D Measured data
+data_path_21D = [data_path '21D Measured Data\PDD-Profiles\SSD=100cm'];
+Measured_21D_table = Import_eMC_Data(import_parameters, data_path_21D, description);
+% Keep only 21D Data
+FindLinac = @(x) isempty(strfind(x, '21D'));
+index = cellfun(FindLinac,Measured_21D_table.Linac);
+Measured_21D_table(index,:) = [];
+% Get a list of the depths and orientations that the profiles were measured at
+Profile_Index = find(strcmp(Measured_21D_table.Type,'Profile'));
+depths_21D = unique(cell2mat(Measured_21D_table.Depth(Profile_Index)));
+directions_21D = unique(Measured_21D_table.Direction(Profile_Index));
+
+% Import 21A Measured data
+data_path_21A = [data_path '21A Measured data\electron profiles and PDDs for isodose lines'];
+Measured_21A_table = Import_eMC_Data(import_parameters, data_path_21A, description);
+% Get a list of the depths and orientations that the profiles were measured at
+Profile_Index = find(strcmp(Measured_21A_table.Type,'Profile'));
+depths_21A = unique(cell2mat(Measured_21A_table.Depth(Profile_Index)));
+directions_21A = unique(Measured_21A_table.Direction(Profile_Index));
+% Make a combined list of the depths and orientations
+depths = union(depths_21A,depths_21D);
+directions = union(directions_21A,directions_21D);
+
+% Import Eclipse Calculated Data
+SSD = '100 cm';
+Algorithm = 'Golden Beam';
+% data_path_calc = [data_path 'Eclipse Calculated Data\High Accuracy'];
+data_path_calc = [data_path 'Eclipse Calculated Data\High Accuracy'];
+Calculated_table = Import_eMC_Data(import_parameters, data_path_calc, description, SSD, Algorithm, depths, directions);
+% Keep only square field sizes
+FieldSize = Calculated_table.FieldSize;
+f = @issquare;
+index = cellfun(f,FieldSize);
+Calculated_table(~index,:) = [];
+
+% Merge and Save the tables
+DataTable = [Measured_21D_table; Measured_21A_table; Calculated_table];
+analysis_save_path = [save_path description '\'];
+mkdir(analysis_save_path);
+imported_mat_file = [analysis_save_path 'imported_data.mat'];
+save(imported_mat_file,'DataTable');
+
 %% Load Data
-% load('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat')
-% % Match the data in the tables
-% % Search for variables with 'table' in the name
-% variables = who;
-% table_index = cellfun(@(A) isempty(A),strfind(variables,'table'));
-% table_variables = variables(table_index);
-
-%TODO Add a sorting column
-%TODO can't use X and Y for Profiles
-%% Select X & Y columns for PDDs and add Curve Labels
- 
-% 21D measured
-Measured_21D_table.X = Measured_21D_table. Depth;
-Measured_21D_table.Y = Measured_21D_table.Dose;
-Curve_label_string = '21D Measured';
-Curve_label = cell(size(Measured_21D_table,1),1);
-for i = 1:size(Measured_21D_table,1)
-    Curve_label{i} = Curve_label_string;
-end
-Measured_21D_table.Curve_label = Curve_label;
-
-% 21A measured
-Measured_21A_table.X = Measured_21A_table.Depth;
-Measured_21A_table.Y = Measured_21A_table.Dose;
-Curve_label_string = '21A Measured';
-Curve_label = cell(size(Measured_21A_table,1),1);
-for i = 1:size(Measured_21A_table,1)
-    Curve_label{i} = Curve_label_string;
-end
-Measured_21A_table.Curve_label = Curve_label;
-
-% BeamConfig 
-% Data already has X and Y
-AlgorithmText = BeamConfig_table.Algorithm;
-DataSourceText = BeamConfig_table.DataLabel;
-DataSourceText = strrep(DataSourceText, 'Calculat','Calculated');
-BeamConfig_table.DataLabel = DataSourceText;
-Curve_label = cell(size(BeamConfig_table,1),1);
-for i = 1:size(DataSourceText,1)
-    Curve_label{i} = ['BeamConfig '  AlgorithmText{i}(11:end)  ' ' DataSourceText{i}];
-end
-BeamConfig_table.Curve_label = Curve_label;
-% Do not use the "Measured" data from BeamConfig
-calcIndex = strcmp(BeamConfig_table.DataLabel,'Calculated');
-BeamConfig_table = BeamConfig_table(calcIndex,:);
-
-% Eclipse 21A Measured Model 
-Calculated_21A_table.X = Calculated_21A_table.depth;
-Calculated_21A_table.Y = Calculated_21A_table.dose;
-Curve_label_string = 'Eclipse 21A Measured Model';
-Curve_label = cell(size(Calculated_21A_table,1),1);
-for i = 1:size(Calculated_21A_table,1)
-    Curve_label{i} = Curve_label_string;
-end
-Calculated_21A_table.Curve_label = Curve_label;
-
-% Golden Beam 
-GoldenBeam_table.X = GoldenBeam_table.depth;
-GoldenBeam_table.Y = GoldenBeam_table.dose;
-Curve_label_string = 'Eclipse Golden Beam Model';
-Curve_label = cell(size(GoldenBeam_table,1),1);
-for i = 1:size(GoldenBeam_table,1)
-    Curve_label{i} = Curve_label_string;
-end
-GoldenBeam_table.Curve_label = Curve_label;
+save_path = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning';
+description = 'High Accuracy Open Square Fields';
+% Analysis_folder = 'Square Fields Analysis';
+analysis_save_path = [save_path '\' description];
+imported_mat_file = [analysis_save_path '\' 'imported_data.mat'];
+load(imported_mat_file)
 
 
+%% Identify Groups for  Plotting and spreadsheets
 
-%% Create Plot tables
-Matchingtables.BeamConfig_table = BeamConfig_table;
-Matchingtables.Measured_21A_table = Measured_21A_table;
-Matchingtables.Measured_21D_table = Measured_21D_table;
-Matchingtables.GoldenBeam_table = GoldenBeam_table;
-Matchingtables.Calculated_21A_table = Calculated_21A_table;
-
-%TODO add Sort parameter
-parameters = {'FieldSize','SSD'};
-select{1} = {'Type','PDD'};
-select{2} = {'Energy','12 MeV'};
-MatchParameters = {'FieldSize'};
-eMC_PDD_Plot_table = Match_Data(Matchingtables,MatchParameters,select);
-% Save testing data
-save('\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_data.mat','eMC_PDD_Plot_table');
-% eMC_PDD_Plot_table.Properties.VariableNames
-% selected = strcmp(eMC_PDD_Plot_table{:,'Energy'},'12 MeV');
-
-%% Save the data as an Excel file
-% Indicate the selection criteria
-select_header = cell(size(select,2),size(eMC_PDD_Plot_table,1)+1);
-for i = 1:size(select,2)
-    select_header(i,1:2) = select{i};
-end
-
-% Extract Depth column
-% All curves will have the same spacing, find the longest one
-Depth_sets = eMC_PDD_Plot_table{:,'X'};
-Depth_length = cellfun(@(x) size(x,1), Depth_sets);
-DepthIndex = find(Depth_length == max(Depth_length));
-Depth = num2cell(cell2mat(eMC_PDD_Plot_table{DepthIndex(1),'X'}));
-%pad the depth column
-pad = cell(size(MatchParameters,1)+1,1);
-Depth = [pad;'Depth (cm)'; Depth];
-
-% Collect the dose columns
-key_list = eMC_PDD_Plot_table{:,'key'};
-unique_keys = sort(unique(key_list));
-Index = 1;
-Header = cell(size(MatchParameters,1)+2,size(eMC_PDD_Plot_table,1));
-Dose_cell = cell(size(Depth,1),size(eMC_PDD_Plot_table,1));
-for i = 1:size(unique_keys,1)
-    KeyIndex = find(strcmp(eMC_PDD_Plot_table{:,'key'},unique_keys{i}));
-    for j = 1:size(KeyIndex,1)
-        for k = 1:size(MatchParameters,1)
-            Header{k,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),MatchParameters{k}});
-        end
-        Header{k+1,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'key'});
-        Header{k+2,Index} = cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Curve_label'});
-        Dose = num2cell(cell2mat(eMC_PDD_Plot_table{KeyIndex(j),'Y'}));
-        %Pad the dose cell array
-        if size(Dose,1) > size(Dose_cell,1)
-            Dose_cell{size(Dose,1),1} = '';
-        elseif size(Dose,1) < size(Dose_cell,1)
-            Dose{size(Dose_cell,1),1} = '';
-        end
-        Dose_cell(:,Index) = Dose;
-        Index = Index +1;
-    end
-end
-
-% Merge the headers and data cells
-Excel_table = [select_header; [Depth, [Header; Dose_cell]]];
-% Create the spreadsheet
-Excel_filename = '\\dkphysicspv1\e$\Gregs_Work\Eclipse\eMC 13.6.23 Commissioning\electron_PDD_data.xls';
-Excel_sheet = '12 MeV PDDs';
-xlswrite(Excel_filename,Excel_table,Excel_sheet,'A1')
- 
-%% Plot the data
-eMC_PDD_Plot_table = sortrows(eMC_PDD_Plot_table,{'key'});
-Plot_Groups = findgroups(eMC_PDD_Plot_table.key);
-maxDepth = 8;
-depthIncrement = 1;
-colors = {'red','green','blue','cyan','magenta','yellow','black','white'};
-markers = {'+','o','*','.','x','s','d','^','v','>','<','p','h'};
-linestyles = {'-','--',':','-.'};
-for i = 1:max(Plot_Groups)
-    %% Select the data
-    index = find(Plot_Groups == i);
-    FigureTitle = eMC_PDD_Plot_table{index(1),'key'}{1};
-    f = figure('NumberTitle','off','Name',FigureTitle);
-    % plot the full curves 
-    subplot(2,1,1);
-    for j=1:size(index,1)
-        LegendName = eMC_PDD_Plot_table{index(j),'Curve_label'}{1};
-        X = cell2mat(eMC_PDD_Plot_table{index(j),'X'});
-        Y = cell2mat(eMC_PDD_Plot_table{index(j),'Y'});
-        graph = plot(X,Y,'DisplayName',LegendName);
-        hold on
-        set(graph,'Color',colors{j},'LineWidth',2)
-    end
-    % configure the graph
-    xlabel('Depth (cm)')
-    ylabel('Relative Dose (%)')
-    Title = FigureTitle;
-    title(Title,'FontName','Arial','FontSize',20,'fontweight','b')
-    legend('show')
-    
-    ylim(gca,[0 101]);
-    set (gca,'YTick',0:10:101);
-    xlim(gca,[0 7.5]);
-    set (gca,'XTick',0:.5:7.5);
-    grid(gca,'minor')
-
-    % plot the curves from 1-4.5 cm (80%)
-       subplot(2,1,2);
-    for j=1:size(index,1)
-        LegendName = eMC_PDD_Plot_table{index(j),'Curve_label'}{1};
-        X = cell2mat(eMC_PDD_Plot_table{index(j),'X'});
-        Y = cell2mat(eMC_PDD_Plot_table{index(j),'Y'});
-        graph = plot(X,Y,'DisplayName',LegendName);
-        hold on
-        set(graph,'Color',colors{j},'LineWidth',2)
-    end
-    % configure the graph
-    xlabel('Depth (cm)')
-    ylabel('Relative Dose (%)')
-    Title = FigureTitle;
-    title(Title,'FontName','Arial','FontSize',20,'fontweight','b')
-    legend('show')
-    
-    ylim(gca,[80 101]);
-    set (gca,'YTick',80:2:101);
-    xlim(gca,[1 4.5]);
-    set (gca,'XTick',1:0.5:4.5);
-    grid(gca,'minor') 
-
-    box(gca,'on');
-    set(f, 'Units','inches')
-    set(f, 'Position',[5 3 8 5])
-    
-end
-       
-return        
-%%%%%    
-%%Done to Here 
-%%%%%        
-        
-        
-%% 
-        
-        
-        %% Calculate Dose Differences
-    DifferenceIndex = 1:min([size(CalculatedDose,1) size(MeasuredDose,1)]);
-    DoseDifference = MeasuredDose(DifferenceIndex) - CalculatedDose(DifferenceIndex);
-
-
-  
-
-    %% Plot a zoomed in curve
-    subplot(3,1,2);
-    LegendName = 'AAA Calculated Data';
-    a = plot(CalculatedDepth,CalculatedDose,'r','DisplayName',LegendName);
-    hold on
-    
-    % Plot the TrueBeam measured data
-    LegendName = 'TrueBeam Measured Data with Depth Correction';
-    b = plot(MeasuredDepth,MeasuredDose,'b','DisplayName',LegendName);
-    
-    % Plot the Golden Beam data
-    LegendName = 'Golden Beam Data';
-    c = plot(GoldenBeamDepth,GoldenBeamDose,'g','DisplayName',LegendName);
-    
-    set(gca,'FontName','Arial','FontSize',16);
-    set(a,'Color','red','LineWidth',2)
-    set(b,'Color','blue','LineWidth',2)
-    set(c,'Color','green','LineWidth',2)
-    % set(d,'Color','magenta','LineWidth',2)
-    
-    xlabel('Depth (cm)')
-    ylabel('Relative Dose (%)')
-    % Title = FigureTitle;
-    % Title = [header{1}; header{3}; 'Field Size ' FieldSize];
-    % title(Title,'FontName','Arial','FontSize',20,'fontweight','b')
-    legend('show')
-    
-    xlim(gca,[0 5]);
-    ylim(gca,[90 101]);
-    set (gca,'YTick',0:1:101);
-    set (gca,'XTick',0:0.5:5);
-    set (gca,'XMinorGrid','on','XGrid','on','YGrid','on','YMinorGrid','on');
-    
-    %% Plot Difference
-    subplot(3,1,3);
-    set(gca,'FontName','Arial','FontSize',18);
-    a = plot(MeasuredDepth(DifferenceIndex),DoseDifference);
-    set(a,'Color','blue','LineWidth',2)
-    xlabel('Distance (cm)')
-    ylabel('Difference (%)')
-    title('Differences','FontName','Arial','FontSize',16,'fontweight','b');
-    % Mark the zero line
-    hold on
-    c = plot([0 30],[0 0]);
-    set(c,'Color','black','LineWidth',2)
-    xlim(gca,[0 30]);
-    ylim(gca,[-3 3]);
-    set (gca,'YTick',-3:0.5:3);
-    set (gca,'XTick',0:5:30);
-    grid(gca,'minor')
-    %       ylim(gca,[min(DoseDifference) max(DoseDifference)]);
-    
-    % box(gca,'on');
-    % set(f, 'Units','inches')
-    % set(f, 'Position',[5 3 8 5])
-    
-
-
-%% Plot Profile Data
-MatchedIndex = MatchProfileData (CalculatedAAAProfiles, MeasuredData_10MV_TR1, GoldenBeamProfiles);
-
-%% Select Data to Plot
-for i = 1:size(MatchedIndex,1);
-    %% Select the data
-    FigureTitle = [CalculatedAAAProfiles(MatchedIndex(i,1)).PlanName ...
-        '   Depth = ' ...
-        num2str(CalculatedAAAProfiles(MatchedIndex(i,1)).depth) ...
-        ' cm'];
-    CalculatedDistance = CalculatedAAAProfiles(MatchedIndex(i,1)).distance;
-    CalculatedDose = CalculatedAAAProfiles(MatchedIndex(i,1)).dose;
-    MeasuredDistance_TR1 = MeasuredData_10MV_TR1(MatchedIndex(i,2)).Distance;
-    MeasuredDose_TR1 = MeasuredData_10MV_TR1(MatchedIndex(i,2)).Dose;
-    GoldenBeamDistance = GoldenBeamProfiles(MatchedIndex(i,3)).Distance;
-    GoldenBeamDose = GoldenBeamProfiles(MatchedIndex(i,3)).Dose;
-    
-    %% Select Range
-    Limits = [-min(CalculatedDistance) max(CalculatedDistance) ...
-        -min(GoldenBeamDistance) max(GoldenBeamDistance) ...
-        -min(MeasuredDistance_TR1) max(MeasuredDistance_TR1)];
-    
-    % determine the field size
-    FieldSizeString = MeasuredData_10MV_TR1(MatchedIndex(i,2)).FieldSize;
-    FieldSize = sscanf(FieldSizeString, '%f %*[^x] %*s')/10;
-    
-    %find a nice round number for the distance plot
-    RangeStep = ceil(FieldSize/10/0.5)*0.5;
-    DistanceLimit = ceil(min(Limits(:))/RangeStep)*RangeStep;
-    
-    MaxDose = max([max(CalculatedDose) max(MeasuredDose_TR1) max(GoldenBeamDose)]);
-    Doselimit = ceil(MaxDose)+5;
-    
-    %% Calculate Dose Differences
-    % find the matching distance indicies
-    % need to round off numbers to deal with floating point inaccuracies
-    [DifferenceDistance,PointMatch_GB,PointMatch_TR1] = intersect(round(GoldenBeamDistance.*1000), ...
-        round(MeasuredDistance_TR1.*1000));
-    DifferenceDistance = DifferenceDistance./1000;
-    
-    DoseDifference = MeasuredDose_TR1(PointMatch_TR1) - GoldenBeamDose(PointMatch_GB);
-    
-    
-    % Calculate the distance between 50% points
-    DistanceError = ProfileDistanceError(MeasuredDistance_TR1,MeasuredDose_TR1, ...
-        GoldenBeamDistance,GoldenBeamDose);
-    %% Plot the data
-    f = figure('NumberTitle','off','Name',FigureTitle);
-    
-    %% plot the full curves
-    subplot(2,1,1);
-    % Plot the calculated data
-    LegendName = 'AAA Calculated Data';
-    a = plot(CalculatedDistance,CalculatedDose,'r','DisplayName',LegendName);
-    hold on
-    
-    % Plot the TrueBeam measured data
-    LegendName = 'TrueBeam Measured Data';
-    b = plot(MeasuredDistance_TR1,MeasuredDose_TR1,'b','DisplayName',LegendName);
-    
-    % Plot the Golden Beam data
-    LegendName = 'Golden Beam Data';
-    c = plot(GoldenBeamDistance,GoldenBeamDose,'g','DisplayName',LegendName);
-    
-    set(gca,'FontName','Arial','FontSize',16);
-    set(a,'Color','red','LineWidth',2)
-    set(b,'Color','blue','LineWidth',2)
-    set(c,'Color','green','LineWidth',2)
-%     set(d,'Color','magenta','LineWidth',2)
-    
-    xlabel('Distance from CAX (cm)')
-    ylabel('Relative Dose (%)')
-    Title = FigureTitle;
-    % Title = [header{1}; header{3}; 'Field Size ' FieldSize];
-    title(Title,'FontName','Arial','FontSize',20,'fontweight','b')
-    legend('show')
-    
-    xlim(gca,[-DistanceLimit DistanceLimit]);
-    ylim(gca,[0 Doselimit]);
-    set (gca,'YTick',0:10:Doselimit);
-    set (gca,'XTick',-DistanceLimit:2*RangeStep:DistanceLimit);
-    grid(gca,'minor')
-    
-    
-    %% Plot Difference
-    subplot(2,1,2);
-    set(gca,'FontName','Arial','FontSize',18);
-    FieldSizeString = plot(DifferenceDistance,DoseDifference);
-    set(FieldSizeString,'Color','blue','LineWidth',2)
-    xlabel('Distance from CAX (cm)')
-    ylabel('Difference (%)')
-    title('TR1 - 21A Differences','FontName','Arial','FontSize',16,'fontweight','b');
-    % Mark the zero line
-    hold on
-    c = plot([-DistanceLimit DistanceLimit],[0 0]);
-    set(c,'Color','black','LineWidth',2)
-    xlim(gca,[-DistanceLimit DistanceLimit]);
-    set (gca,'XTick',-DistanceLimit:2*RangeStep:DistanceLimit);
-    ylim(gca,[-3 3]);
-    set (gca,'YTick',-3:0.5:3);
-    grid(gca,'minor')
-    
-    % Create textbox
-    annotation(f,'textbox', [0.16 0.33 0.4 0],...
-        'String',{['50% distance error = ' ...
-        num2str(DistanceError(1)*10,1) ' mm, ' ...
-        num2str(DistanceError(2)*10,1) ' mm']}, ...
-        'FontWeight','bold',...
-        'FontSize',14,...
-        'FitBoxToText','off',...
-        'LineStyle','none');
-    
-    % box(gca,'on');
-    % set(f, 'Units','inches')
-    % set(f, 'Position',[5 3 8 5])
-end
+% First split by PDD and Profile
+[TypeIndex,Types] = findgroups(DataTable(:,'Type'));
+PDDs = DataTable(TypeIndex==find(strcmp(Types{:,'Type'},'PDD')),:);
+Profiles = DataTable(TypeIndex==find(strcmp(Types{:,'Type'},'Profile')),:);
+% Analyze_profiles(Profiles, analysis_save_path)
+Analyze_PDDs(PDDs, analysis_save_path)
